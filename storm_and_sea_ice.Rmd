@@ -1,0 +1,382 @@
+---
+title: "Storm and Sea ice data Project"
+author: 'Group members: Ravneet Kaur and Daniel Jeong'
+date: "11/30/2023"
+output: pdf_document
+editor: visual
+format:
+  html:
+    toc: yes
+    toc_float: yes
+    number-sections: yes
+    html-math-method:
+      method: mathjax
+  pdf:
+    documentclass: scrbook
+    fontfamily: libertinus
+---
+```{r label=setup, include=FALSE, message=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(tidymodels)
+library(arrow)
+library(readxl)
+library(writexl)
+library(openxlsx)
+library(repurrrsive)
+library(jsonlite)
+library(scales)
+library(patchwork)
+library(ggrepel)
+library(ggthemes)
+library(ggridges)
+```
+
+REFERENCES:
+
+Article references: 
+20, R.C. |June et al. (2019) How climate change impacts the economy, State of the Planet. Available at:
+     https://news.climate.columbia.edu/2019/06/20/climate-change-economy-impacts/ (Accessed: 30 November 2023). 
+     
+https://www.worldbank.org/en/country/malawi/overview
+
+https://www.heritage.org/index/ranking
+
+pdf reference:
+
+sea-ice-analysis-spreadsheets-overview.pdf (nsidc.org)
+
+Use of AI:
+AI used:
+OpenAI. (n.d.). ChatGPT (Version 3.5) [AI language model]. OpenAI.
+Description of contribution of the AI: Used above AI, to get a detailed information to fix errors in code. Also, used to see different ways to visualize the data using plots and maps.
+
+### Data set 1: Storm data for both Atlantic and Pacific basins
+
+1. Introduction:
+Cyclones, powerful and often destructive weather phenomena, have been a subject of interest for meteorologists and researchers worldwide. In this part of the report will provide a detailed analysis of cyclones using the data frame named 'cyclones' which was extracted from "Cyclone-1850-2023.parquet" file.
+
+2. Data Overview
+Table_DF1 named 'cyclones_need' is a subset of the cyclones dataset, focusing on key columns such as Basin, Number, NameYear, Name, ObservYear, Month, Day, Hour, Status, Latitude, Longitude, Max Wind, num_lat, num_long, and Category. This table provides detailed information about individual cyclones, including their geographic location, intensity, and temporal occurrence.
+
+```{r error=TRUE}
+cyclone_parquet_file <- "Cyclone-1850-2023.parquet"
+cyclones <- cyclone_parquet_file |>
+  read_parquet()
+cyclones_need <- cyclones|>
+  select(c(Basin,Number,NameYear,Name,ObservYear,Month,Day,Hour,
+           Minute,status,latitude,longitude,max_wind,num_lat,
+           num_long,observ_time,category)) #Only extracts columns that I need from cyclones 
+
+```
+
+Table_DF2 named 'cyclones_month', summarizes the number of cyclones that occurred globally each month. It includes two columns: Month (ranging from 1 to 12) and Amount, representing the count of cyclones in each respective month.
+
+```{r error=TRUE}
+cyclones_month <- cyclones |>
+  group_by(Month)|>
+  summarise(Amount = n()) #Amount of cyclones happened in each month
+```
+
+Table_DF3 named 'cyclones_year' focuses on yearly cyclone occurrences, spanning from 1851 to 2022. It consists of two columns: Year and Amount2, indicating the total number of cyclones globally for each year.
+
+```{r error=TRUE}
+cyclones_year<- cyclones |>
+  group_by(NameYear) |>
+  summarise(Amount=n())#Amount of cyclones happened in each year
+```
+
+3.  Graphs
+Graph 1 named 'cyclones_bar' presents a bar plot depicting the monthly occurrences of cyclones globally. The x-axis represents the months (1 to 12), and the y-axis shows the corresponding number of cyclones in each month.
+
+```{r error=TRUE}
+cyclones_bar <- cyclones |>
+  ggplot() + 
+  geom_bar(aes(x = factor(Month)), fill = "skyblue", stat = "count") +
+  scale_x_discrete(labels = month.name) +
+  theme_minimal() +
+  labs(title = "Number of Cyclones Happened in Each Month", fill = NULL, legend.position = "none",x="Month")+
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) #barplot
+cyclones_bar
+```
+Graph 2 named 'cyclones_points' is a combination of point plot with regression line where it illustrates the yearly distribution of cyclones worldwide. The x-axis displays the years (1851 to 2022), while the y-axis indicates the total number of cyclones for each respective year.
+
+```{r}
+cyclones_points<-cyclones_year |>
+  ggplot(aes(x = NameYear,y=Amount)) + geom_point()+ geom_smooth()+ theme_minimal() + labs(
+    title = "Amount of Cyclones Happened in the World over the Years",
+    subtitle = "since 1851 to 2022",
+    x = "Year",
+    y = "Amount"
+  )#point plot with line for average
+cyclones_points
+```
+Graph 3 named 'gg_all' is a map graph showcasing the geographic locations of cyclones globally from 1851 to 2022. Different colors or symbols represent cyclones of varying categories, including Hurricane, Tropical Depression, and Thunderstorm.
+
+```{r}
+world <- map_data("world")
+
+cyclones_all <- cyclones |> filter(num_long >= -300)|>
+  mutate(real_cat = case_when(
+    category %in% c("1", "2", "3", "4", "5") ~ "HU",
+    TRUE ~ as.character(category)
+  ))
+
+gg <- ggplot()
+
+gg <- gg + geom_map(
+  data = world,
+  map = world,
+  aes(x = long, y = lat, map_id = region),
+  fill = "#ffffff",
+  color = "#ffffff",
+  size = 0.20
+)
+
+# Add the cyclones data as points
+
+ggall <- gg + geom_point(
+  data = cyclones_all,
+  aes(x = num_long, y = num_lat, color = real_cat),
+  na.value = "gray",
+  size = 1,       # Adjust the size of the points
+
+  )+
+  scale_color_manual(
+  values = c("HU" = "red", "TS" = "green", "TD" = "blue"),
+  na.value = NA)+
+  labs(
+    title = "Locations of Where Cyclones Occured in the World",
+    subtitle = "since 1851 to 2022",
+    color = "Category")
+
+ggall
+```
+
+
+### Data set 2: Sea ice data 
+
+```{r error=TRUE}
+sea_ice_regional <- "https://masie_web.apps.nsidc.org/pub//DATASETS/NOAA/G02135/seaice_analysis/"
+N_sea <- "N_Sea_Ice_Index_Regional_Daily_Data_G02135_v3.0.xlsx"
+S_sea <- "S_Sea_Ice_Index_Regional_Daily_Data_G02135_v3.0.xlsx"
+ice_extent <- "	Sea_Ice_Index_Daily_Extent_G02135_v3.0.xlsx"
+sea_ice_files <- c(N_sea, S_sea, ice_extent)
+```
+
+Step 1: Loading the sea_ice_regional N_sea data:
+Description of file:
+N_Sea_Ice_Index_Regional_Daily_Data_G02135_vX.x.xlsx :
+The spreadsheet includes the average daily sea ice extent and area for the region of ‘Arctic Ocean’. Further the Arctic Ocean have 14 regions as: Baffin Bay, Barents Sea, Beaufort Sea, Bering Sea, Canadian Archipelago, Central Arctic Ocean, Chukchi Sea, East Siberian Sea, Greenland Sea, Hudson Bay, Kara Sea, Laptev Sea, Sea of Okhotsk, and Gulf of St. Lawrence. There are total 29 sheets in the spreadsheet with 28 sheets containing data and the last one named as ‘Documentation’. Some of the columns are: month, day, Year, ice_extent.
+
+The Excel file containing sea ice data (sea_ice_regional_Nsea_xlsx) and loads it into a workbook(workbook_Nsea) using the loadWorkbook() function and then  extracts the names of the sheets within the workbook using names() function.
+```{r}
+sea_ice_regional_Nsea_xlsx <- paste(sea_ice_regional,N_sea, sep="")
+
+workbook_Nsea <- sea_ice_regional_Nsea_xlsx |>
+  loadWorkbook()
+
+(sheet_names <- workbook_Nsea |>
+  names()
+)
+```
+Step 2: Data Cleaning and Manipulation:
+
+i) Identifies sheets containing data related to N_sea ice extent in square kilometers(km^2).
+
+```{r}
+data_sheets <- sheet_names[str_detect(sheet_names, 'km\\^2$')]
+```
+ii) Important: Creating a function (func_ice_extent_sheet) to clean and manipulate single sheet in the excel file. So, the code can be reused for other datasets such as S_sea data and more. The data is read using read.xlsx().Then it undergoes cleaning the data like  using pivot_longer()(reshaping), manipulating column names, and reformatting column values (e.g.renaming columns).
+
+```{r}
+func_ice_extent_sheet <- function(xlsx_file = sea_ice_regional_Nsea_xlsx, single_sheet) {
+  xlsx_file |>
+  read.xlsx(
+    sheet = single_sheet,
+    skipEmptyCols = TRUE,
+    fillMergedCells = TRUE,
+    ) |>
+   pivot_longer(
+     cols = !c(month, day),
+     names_to = "year",
+     names_transform = list(year = as.integer),
+     values_to = "ice_extent", 
+     values_drop_na = TRUE,
+   ) |>
+   mutate(
+     month = ordered(
+       month,
+       levels = c("January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December")),
+     sheet_name = single_sheet
+   ) |>
+   separate_wider_regex(
+    cols = sheet_name,
+    patterns = c(
+      region = "[\\w-]+",   # <- this is anticipating the entries with names containing `-`
+      "-",
+      measure = "Area|Extent",
+      "-km\\^2"
+     )
+   ) |>
+   mutate(
+     region = str_replace(region, '-', ' ')
+   )
+}
+```
+Step 3: Combining Data:
+i) purrr::map() is used to apply the func_ice_extent_sheet function to each sheet (data_sheets) and combine the results into a list of data frames (all_sheets_Nsea).
+
+```{r error = FALSE}
+all_sheets_Nsea <- purrr::map(
+  data_sheets,
+  \(single_sheet) func_ice_extent_sheet(sea_ice_regional_Nsea_xlsx, single_sheet)
+)
+
+```
+
+ii) purrr::list_rbind() is used to bind these data frames into a single data frame (Nsea_ice_region_extent).
+
+```{r}
+(Nsea_ice_region_extent <- all_sheets_Nsea |>
+  purrr::list_rbind()
+ )
+```
+
+Step 4.Saving Data: Finally, saving the data and can be used to visualize the reach to conclusions.
+The processed data (Nsea_ice_region_extent) is being saved as a Parquet file (Nsea_ice_region_extent.parquet) using the write_parquet().
+
+```{r}
+
+Nsea_ice_region_extent_parquet <- "Nsea_ice_region_extent.parquet"
+
+Nsea_ice_region_extent |> write_parquet(Nsea_ice_region_extent_parquet)
+```
+
+Step 5. Now reusing the code in steps 1-4 for a different data set, here for S_sea data(sea_ice_regional_Ssea_xlsx).
+
+2.	S_Sea_Ice_Index_Regional_Daily_Data_G02135_vX.x.xlsx :
+This spreadsheet also contains average daily sea ice extent and area but for the ‘Antarctic Ocean’ region. Further the region is divided into 5 sub regions: Bellingshausen Amundsen Sea, Indian Ocean, Pacific Ocean, Ross Sea, and Weddel Sea. There are total 11 sheets out of which 10 contains data and the final one is named ‘Documentataion’. Main columns are: month, day, year, ice_extent, region , measure.
+The function func_ice_extent_sheet(sea_ice_regional_Ssea_xlsx, single_sheet) is reused, that is defined above to clean and manipulate the S_Sea_Ice_Index_Regional_Daily_Data_G02135_v3.0.xlsx. Finally, the processed data (Ssea_ice_region_extent) is being saved as a Parquet file (Ssea_ice_region_extent.parquet) using the write_parquet().
+
+```{r}
+sea_ice_regional_Ssea_xlsx <- paste(sea_ice_regional,S_sea, sep="")
+
+workbook_Ssea <- sea_ice_regional_Ssea_xlsx |>
+  loadWorkbook()
+
+(sheet_names <- workbook_Ssea |>
+  names() # this corresponds to `excel_sheets()` in `readxl` package
+)
+(data_sheets <- sheet_names[str_detect(sheet_names, 'km\\^2$')])
+all_sheets_Ssea <- purrr::map(
+  data_sheets,
+  \(single_sheet) func_ice_extent_sheet(sea_ice_regional_Ssea_xlsx, single_sheet)
+  )
+
+(Ssea_ice_region_extent <- all_sheets_Ssea |>
+  purrr::list_rbind()
+ )
+Ssea_ice_region_extent_parquet <- "Ssea_ice_region_extent.parquet"
+
+Ssea_ice_region_extent |> write_parquet(Ssea_ice_region_extent_parquet)
+```
+```
+Step 6.Prepare and visualize the data:
+
+i) Loading the processed data (N_sea and S_sea) for  creating visualizations. The plots will provide insights into how the sea ice extent/area has varied over time in different regions within the Arctic and Antarctic regions.
+
+# Based on the resulted line plot, it is evident that the 'Central Arctic' part in North sea region(Arctic region) is a 'Outlier' both in terms if area and ice extent.The ice extent for this particular part is 3500000.
+#The Arctic experiences significant variability in sea ice extent, with a noticeable decreasing trend over the past few years/decades.
+
+
+```{r}
+
+# Load the processed sea ice data
+Nsea_ice_region_extent_read <- arrow::read_parquet("Nsea_ice_region_extent.parquet")
+
+
+# Plotting for the Arctic (N_sea)
+arctic_plot <- ggplot(Nsea_ice_region_extent, aes(x = year, y = ice_extent, color = region)) +
+  geom_line() +
+  facet_wrap(~ measure) +
+  labs(title = "Arctic Sea Ice Extent(N_sea)/Area vs Time", x = "Year", y = "Ice Extent or Area") +
+  theme_minimal()
+  
+arctic_plot
+
+# Based on the resulted line plot, it is evident that the 'Central Arctic' part in North sea region(Arctic region) is a 'Outlier' both in terms if area and ice extent.The ice extent for this particular part is 3500000.
+#The Arctic experiences significant variability in sea ice extent, with a noticeable decreasing trend over the past few years/decades.
+
+```
+
+# Based the line plot for South Sea region(Antarctic) the part covering most area is 'Weddel' and with highest ice extent as well(reaching up to 6500000)
+# Antarctic sea ice has less seasonal variability compared to the Arctic, with more stability in its overall extent.
+
+```{r}
+# Plotting for the Antarctic (S_sea)
+Ssea_ice_region_extent_read <- arrow::read_parquet("Ssea_ice_region_extent.parquet")
+antarctic_plot <- ggplot(Ssea_ice_region_extent, aes(x = year, y = ice_extent, color = region)) +
+  geom_line() +
+  facet_wrap(~ measure) +
+  labs(title = "Antarctic Sea Ice Extent(S_sea)/Area vs Time", x = "Year", y = "Ice Extent or Area") +
+  theme_minimal()
+antarctic_plot
+# Based the line plot for South Sea region(Antarctic) the part covering most area is 'Weddel' and with highest ice extent as well(reaching up to 6500000)
+# Antarctic sea ice has less seasonal variability compared to the Arctic, with more stability in its overall extent.
+
+```
+ii) Now, generating a bar plot(using geom_bar) illustrating the changes in ice extent over month, where each bar represents the total ice extent for each month for different regions within the North and South. 
+
+# Arctic sea ice covers the Arctic Ocean and its surrounding seas. It reaches its maximum extent during the winter months (typically around March) and shrinks to its minimum during the summer (usually in September).
+
+```{r}
+
+north_ice_extent_bar <- ggplot(Nsea_ice_region_extent, aes(x = month, y = ice_extent, fill = region)) +
+  geom_bar(stat = "identity", position = "stack") +
+  labs(title = "North Pole (Arctic) Ice Extent by Month",
+       x = "Month",
+       y = "Ice Extent",
+       fill = "Region") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle=45, hjust = 1))
+north_ice_extent_bar
+
+# Arctic sea  reaches its maximum extent during the winter months (typically around March) and shrinks to its minimum during the summer (usually in September).
+```
+# the Antarctic sea ice reaches its maximum extent during the austral winter (around September) and reduces to its minimum during the summer (around February).
+
+```{r}
+south_ice_extent_bar <- ggplot(Ssea_ice_region_extent, aes(x = month, y = ice_extent, fill = region)) +
+  geom_bar(stat = "identity", position = "stack") +
+  labs(title = "South Pole (Antarctic) Ice Extent by Month",
+       x = "Month",
+       y = "Ice Extent",
+       fill = "Region") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle=45, hjust = 1))
+
+south_ice_extent_bar
+
+
+# The Antarctic sea ice reaches its maximum extent during the austral winter (around September) and reduces to its minimum during the summer (around February).
+
+```
+
+CONCLUSIONS:
+
+From Storm data and Sea ice data:
+From the bar plots:
+1. 'north_ice_extent_bar': Arctic sea  reaches its maximum extent during the winter months (typically around March) and shrinks to its minimum during the summer (usually in September).
+
+2. 'south_ice_extent_bar': The Antarctic sea ice reaches its maximum extent during the austral winter (around September) and reduces to its minimum during the summer (around February).
+
+Correlation of Sea data with Storm/cyclones data:
+
+3. From 'cyclones_bar' : most of the cyclones happeing in August and October, in North hemisphere that supports the results from 'north_ice_extent_bar' as the ice extent is minimum during summer, more cyclones are happening in Northern region.
+
+4. From 'arctic_plot': The Arctic experiences significant variability in sea ice extent, with a noticeable decreasing trend over the past few years/decades. Relating it to 'cyclones_point' it shows that number of cyclones are increasing from decaded(1850-2022).
+
+Article: 
+
+On many different levels, the article that was found is connected to our data. The focus is on the ways in which climate change is affecting the economy in the United States. The most important aspects of how it impacts agriculture, infrastructure, human health and productivity, tourism, and the financial sector are brought to light in this article. These main points are connected to the data that we discovered. With regard to the article, agriculture is the most significant connection. According to the paper, climate change will bring about significant increases in temperatures, drought, and flooding. Because of all of these factors, the agriculture sector will suffer a significant amount of damage. If particular crops are unable to be grown at all or in diminished quantities, this will result in an increase in the pricing of such crops. In states that are more dependent on agriculture to maintain a stable economic status, this could result in a cascade of events that are severely detrimental to the financial situation. It is said in the article that increasing sea levels pose a threat to coastal infrastructure, including residences, airports, and docks, among other similar facilities. The melting of polar ice caps and glaciers is evaluated in our paper, along with rising temperatures and rising sea levels, both of which are related with the global warming phenomenon. Additionally, military sites along the East Coast and Gulf Coast are emphasized as being particularly susceptible to the effects of rising sea levels, which will have an effect on operations and require increased maintenance and repair. It is mentioned in the article that hurricanes and their effects on the economy. Additionally, it stresses the role that warmer temperatures and higher sea levels play in amplifying the destructiveness of hurricanes, despite the fact that it admits the difficulty of explicitly attributing particular hurricanes to climate change.
