@@ -1,0 +1,35 @@
+## README
+
+Repository for Storm and Sea Ice Data Project:
+
+"Storm and Sea Ice Data Project" meticulously dissects cyclone occurrences and sea ice trends using the Tidyverse package, amalgamating data analysis, manipulation, and visualization.
+
+### Cyclone Analysis
+
+#### Introduction:
+- Explores cyclones via the 'cyclones' dataset extracted from "Cyclone-1850-2023.parquet" file.
+
+#### Data Overview:
+- Detailed insights into individual cyclones: geographic location, intensity, and temporal occurrence.
+- Tables like 'cyclones_need,' 'cyclones_month,' and 'cyclones_year' summarize cyclone occurrences by month and year.
+
+#### Graphs:
+1. **Monthly Occurrences:** Bar plot depicting the monthly occurrences of cyclones globally.
+2. **Yearly Distribution:** Point plot showing the yearly distribution of cyclones worldwide.
+3. **Geographic Locations:** Map graph showcasing cyclone locations globally with different categories.
+
+### Sea Ice Data Analysis
+
+- Analyzes sea ice data for Arctic and Antarctic regions using the Tidyverse package.
+- Data cleaning, manipulation, and aggregation for North and South Sea Ice Indexes.
+- Line plots illustrating sea ice extent/area variations over time for different regions within the Arctic and Antarctic.
+
+### Data Visualization:
+- Visualizations illustrate changes in ice extent/area over months and years, offering insights into the variability and trends in both poles.
+
+### Conclusions:
+1. **Seasonal Trends:** Arctic sea ice reaches maximum extent in March, while Antarctic ice reaches maximum in September.
+2. **Correlation:** Cyclone occurrences align with ice extent trends, showing more cyclones during summer months when ice extent is lower.
+3. **Climate Change Impact:** Aligns with the findings of an external article on climate change's economic impact, connecting agriculture, infrastructure, and the economy with observed data. For instance, rising temperatures and sea levels correlate with melting ice caps and increased cyclone occurrences.
+
+This project, meticulously executed using the Tidyverse package, provides a robust analysis of cyclone occurrences and sea ice trends, linking empirical data to broader discussions on climate change and its economic ramifications.
